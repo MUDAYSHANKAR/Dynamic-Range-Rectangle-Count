@@ -1,0 +1,109 @@
+import bisect
+
+class Dynamic2DPointCounter:
+    def __init__(self, operations):
+        all_x = set()
+        all_y = set()
+        for op in operations:
+            if op[0] == 'add':
+                all_x.add(op[1])
+                all_y.add(op[2])
+            elif op[0] == 'query':
+                all_x.add(op[1])
+                all_x.add(op[3])
+                all_y.add(op[2])
+                all_y.add(op[4])
+
+        self.sorted_x = sorted(list(all_x))
+        self.sorted_y = sorted(list(all_y))
+        
+        self.map_x = {val: i for i, val in enumerate(self.sorted_x)}
+        self.map_y = {val: i for i, val in enumerate(self.sorted_y)}
+        
+        self.num_x = len(self.sorted_x)
+        self.num_y = len(self.sorted_y)
+        
+        self.tree = [[] for _ in range(4 * self.num_x)]
+
+    def _add_recursive(self, node, start, end, cx, cy):
+        bisect.insort_left(self.tree[node], cy)
+        
+        if start == end:
+            return
+            
+        mid = (start + end) // 2
+        if cx <= mid:
+            self._add_recursive(2 * node, start, mid, cx, cy)
+        else:
+            self._add_recursive(2 * node + 1, mid + 1, end, cx, cy)
+
+    def add_point(self, x, y):
+        if x not in self.map_x or y not in self.map_y:
+            return
+        cx = self.map_x[x]
+        cy = self.map_y[y]
+        self._add_recursive(1, 0, self.num_x - 1, cx, cy)
+
+    def _query_recursive(self, node, start, end, cx1, cx2, cy1, cy2):
+        if start > cx2 or end < cx1:
+            return 0
+        
+        if cx1 <= start and end <= cx2:
+            y_list = self.tree[node]
+            count_le_y2 = bisect.bisect_right(y_list, cy2)
+            count_lt_y1 = bisect.bisect_left(y_list, cy1)
+            return count_le_y2 - count_lt_y1
+            
+        mid = (start + end) // 2
+        left_count = self._query_recursive(2 * node, start, mid, cx1, cx2, cy1, cy2)
+        right_count = self._query_recursive(2 * node + 1, mid + 1, end, cx1, cx2, cy1, cy2)
+        return left_count + right_count
+
+    def query_rect(self, x1, y1, x2, y2):
+        if x1 > x2 or y1 > y2:
+            return 0
+            
+        cx1 = bisect.bisect_left(self.sorted_x, x1)
+        cx2 = bisect.bisect_right(self.sorted_x, x2) - 1
+        
+        cy1 = bisect.bisect_left(self.sorted_y, y1)
+        cy2 = bisect.bisect_right(self.sorted_y, y2) - 1
+
+        if cx1 > cx2 or cy1 > cy2:
+            return 0
+            
+        return self._query_recursive(1, 0, self.num_x - 1, cx1, cx2, cy1, cy2)
+
+if __name__ == '__main__':
+    operations = [
+        ('add', 3, 1),
+        ('add', 1, 2),
+        ('query', 0, 0, 3, 3),
+        ('add', 4, 4),
+        ('add', 6, 2),
+        ('add', 2, 5),
+        ('add', 5, 5),
+        ('query', 2, 2, 6, 5),
+        ('add', 7, 3),
+        ('query', 4, 1, 7, 4)
+    ]
+    
+    print("--- Dynamic 2D Range Rectangle Count ---")
+    print("\nOperations will be processed in order:")
+    for op in operations:
+        print(f"  {op}")
+        
+    solver = Dynamic2DPointCounter(operations)
+    
+    print("\n--- Processing ---")
+    
+    for i, op in enumerate(operations):
+        if op[0] == 'add':
+            x, y = op[1], op[2]
+            solver.add_point(x, y)
+            print(f"Operation {i+1}: Added point ({x}, {y})")
+        
+        elif op[0] == 'query':
+            x1, y1, x2, y2 = op[1], op[2], op[3], op[4]
+            count = solver.query_rect(x1, y1, x2, y2)
+            print(f"Operation {i+1}: Query for rect ({x1},{y1}) to ({x2},{y2}) -> Found {count} points.")
